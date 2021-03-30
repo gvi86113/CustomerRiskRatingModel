@@ -1,0 +1,190 @@
+"""
+Edited on Mar 04 11:28:24 2021
+
+@editor: Alex.TA.Yin@tw.ey.com
+
+Reminder:
+1. The data is only used as a discussion for model testing and optimization
+2. The data doesn't contain any personal information and doesn't 
+reflect the true pattern of clients' data
+
+Some explanations:
+    
+1. Suppose our client is willing to build a CRR(Customer Risk Rating) System, 
+and the goal is to find out who has a higher risk and should be investigated in 
+more detail.
+
+2. SAR_ALERT
+SAR_ALERT == 'Y' means that in the past the customer had been reported SAR or ALERT, 
+which is an objective behavior of money laundering.
+
+3. There's no limit on the data and any thoughts of variable transforming 
+or using different algorithms are welcome.
+
+4. This data only contains information of OBU corporation customers.
+
+5. Feel free to contact me for more information.
+
+"""
+
+import pandas as pd
+import numpy as np
+
+
+# 1. Column Settings
+# 1.1 Basic Key Value of Customer Information
+key_col = ['CYC_MN', 'CUST_ID', 'CUST_DUP_NO']
+# 1.2 Category
+cat_col = ['CMFCUS1_VIP_CODE', 'CMFCUS1_BUSINESS_FLAG', 'CMFCUS1_NOTAX_FLAG', 
+           'CMFCUS1_FINANCIAL_ACT', 'DP_FG', 'LN_FG', 
+           'IX_FG', 'BD_FG', 'FD_FG', 'WM_FG', 'TR_FG', 'EB_FG', 'CD_FG', 'OT_FG', 
+           'TRUST_YN', 'CONFIRM_YN', 'COMPLEX_CS_FG', 'AUTHORIZED', 'BEARER_SHARE', 
+           'ISSUE_BEARER', 'SOLE_CORP', 'TRUST_HOLDER', 'CDD_STATUS', 'CUST_PANA', 
+           'CUST_THIRD', 'CUST_ADVRS', 'CUST_BAHA', 'CUST_PARA', 'CMFCUS25_AE_TYPE', 
+           'CMFCUS25_FOREIGN_COMPANY', 'CMFCUS25_FOREIGN_ENTITY', 
+           'CMFCUS25_CERTI_FLAG', 'CMFCUS25_TAXFREE_FLAG', 
+           'CMFCUS25_CREATIVE_FLAG', 'CMFCUS25_OSU_FLAG', 'CMFCUS25_PUBLIC_CMPY']
+
+CMFCUS1_VIP_CODE = {'NA': 0.03, 'N': 0.93, 'Y': 0.03}
+CMFCUS1_BUSINESS_FLAG = {'NA': 0.01, 'Y': 0.989}
+CMFCUS1_NOTAX_FLAG = {'NA': 0.07, 'N': 0.925, 'Y': 0.000225}
+CMFCUS1_FINANCIAL_ACT = {'NA': 0.244, 'N': 0.03, 'Y': 0.724}
+DP_FG = {'NA': 0.03, 'v': 0.966}
+LN_FG = {'NA': 0.862, 'v': 0.137}
+IX_FG = {'NA': 0.871, 'v': 0.128}
+BD_FG = {'NA': 0.999, 'v': 0.0006}
+FD_FG = {'NA': 0.996, 'v': 0.003}
+WM_FG = {'NA': 0.895, 'v': 0.104}
+TR_FG = {'NA': 0.989, 'v': 0.0102}
+EB_FG = {'NA': 0.487, 'v': 0.512}
+CD_FG = {'NA': 0.999, 'v': 0.0001}
+OT_FG = {'NA': 0.99764, 'v': 0.00235}
+TRUST_YN = {'NA': 0.373, 'N': 0.626, 'Y': 0.00075}
+CONFIRM_YN = {'NA': 0.373, 'N': 0.093, 'Y': 0.533}
+COMPLEX_CS_FG = {'NA': 0.38, 'N': 0.61, 'Y': 0.005}
+AUTHORIZED = {'NA': 0.393, 'N': 0.604, 'Y': 0.001}
+BEARER_SHARE = {'NA': 0.399, 'N': 0.560, 'Y': 0.039}
+ISSUE_BEARER = {'NA': 0.465, 'N': 0.534, 'Y': 0.0003}
+SOLE_CORP = {'NA': 0.465, 'N': 0.527, 'Y': 0.006}
+TRUST_HOLDER = {'NA': 0.467, 'N': 0.530, 'Y': 0.001}
+CDD_STATUS = {'NA': 0.714, 'N': 0.285}
+CUST_PANA = {'NA': 0.459, 'N': 0.536, 'Y': 0.004}
+CUST_THIRD = {'NA': 0.496, 'N': 0.503, 'Y': 0.0002}
+CUST_ADVRS = {'NA': 0.496, 'N': 0.503, 'Y': 0.0006}
+CUST_BAHA = {'NA': 0.767, 'N': 0.232, 'Y': 0.0003}
+CUST_PARA = {'NA': 0.849, 'N': 0.149, 'Y': 0.0005}
+CMFCUS25_AE_TYPE = {'NA': 0.9993, '1': 0.000012, '2': 0.000599, '7': 0.000075}
+CMFCUS25_FOREIGN_COMPANY = {'NA': 0.145, 'N': 0.852, 'Y': 0.002}
+CMFCUS25_FOREIGN_ENTITY = {'NA': 0.149, 'N': 0.850, 'Y': 0.0001}
+CMFCUS25_CERTI_FLAG = {'NA': 0.193, 'N': 0.0008, 'Y': 0.805}
+CMFCUS25_TAXFREE_FLAG = {'NA': 0.199, 'N': 0.752, 'Y': 0.048}
+CMFCUS25_CREATIVE_FLAG = {'NA': 0.221, 'N': 0.778, 'Y': 0.0001}
+CMFCUS25_OSU_FLAG = {'NA': 0.297, 'N': 0.702, 'Y': 0.000611}
+CMFCUS25_PUBLIC_CMPY = {'NA': 0.46, 'N': 0.528, 'Y': 0.011}
+
+
+# 1.3 Ordinary
+ord_col = ['CMFCUS1_BUSINESS_CODE', 'RISK_LEVEL', 'AMT_RANGE',  
+           'OBU_ANNUAL_INCOME', 'JOB_RISK', 'CMFCUS25_SP_RATING', 
+           'CMFCUS25_MOODYS_RATING', 'CMFCUS25_SRT_SP_RATING', 
+           'CMFCUS25_SRT_MOODYS_RATING', 'CMFCUS25_SRT_FITCH_RATING']
+    
+CMFCUS1_BUSINESS_CODE = {'L': 0.216, 'M': 0.422, 'H': 0.360} # replaced by 'L', 'M', 'H'
+RISK_LEVEL = {'L': 0.059, 'M': 0.537, 'H': 0.403}
+AMT_RANGE = {'NA': 0.395, '1': 0.325, '2': 0.214, '3': 0.06}
+OBU_ANNUAL_INCOME = {'NA': 0.465, '1': 0.348, '2': 0.121, '3': 0.064}
+JOB_RISK = {'L': 0.238, 'M': 0.306, 'H': 0.455}
+CMFCUS25_SP_RATING = {'NA': 0.998, 'A': 0.0002, 'A+': 0.0002, 'A-': 0.0002, 
+                      'BBB-': 0.00008, 'AA+': 0.000075, 'BBB+': 0.000075, 
+                      'AA-': 0.000075}
+CMFCUS25_MOODYS_RATING = {'NA': 0.9990, 'A1': 0.000262, 'Aa3': 0.000150, 
+                          'A2': 0.000125, 'A3': 0.000112, '(P)A1': 0.000075, 
+                          'Aa1': 0.000075, 'Aaa': 0.000075, 'Baa1': 0.000075, 
+                          'A3-': 0.000012}
+CMFCUS25_SRT_SP_RATING = {'NA': 0.999, 'A-1': 0.000499, 'A-2': 0.00275, 
+                          'A-3': 0.000087, 'A-1+': 0.000075}
+CMFCUS25_SRT_MOODYS_RATING = {'NA': 0.999176, 'P-1': 0.000624, 'P-2': 0.0002}
+CMFCUS25_SRT_FITCH_RATING = {'NA': 0.999226, 'F1': 0.000424, 'F1+': 0.0002, 
+                             'F3': 0.000075, 'F2': 0.00005, 'F2-': 0.000025}
+
+
+
+# 1.4 Numeric
+num_col = ['CMFCUS1_ADR_CNT', 'CMFCUS1_MPHONE_CNT', 'CMFCUS1_OPHONE_CNT', 
+           'PEP_COUNT', 'REL_ADVRS_COUNT', 'REL_PEPS_COUNT']
+
+CMFCUS1_ADR_CNT = {'0': 0.0022, '1': 0.3637, '2': 0.5700, '3': 0.0638, 
+                   '4': 0.000037}
+CMFCUS1_MPHONE_CNT = {'0': 0.757, '1': 0.215, '2': 0.025, '3': 0.0020}
+CMFCUS1_OPHONE_CNT = {'0': 0.1244, '1': 0.8078, '2': 0.0251, '3': 0.0020}
+PEP_COUNT = {'0': 0.9973, '1': 0.0024, '2': 0.0001}
+REL_ADVRS_COUNT = {'0': 0.9986, '1': 0.0006, '2': 0.0004, '3': 0.0002}
+REL_PEPS_COUNT = {'0': 0.9928, '1': 0.0006, '2': 0.0004, '3': 0.0002}
+
+
+
+# 1.5 Dummy
+dum_col = ['CMFCUS1_Q_ID', 'CMFCUS1_PURPOSE', 'CMFCUS1_DERIVATIVE', 
+           'CMFCUS1_TITLE_CODE', 'CUST_TYP', 'LN_TYP', 'CONFIRM_TYPE', 
+           'CORP_TYPE', 'CMFCUS25_BRANCH', 'CMFCUS25_FORE_CASH_FLAG']
+
+CMFCUS1_Q_ID = {'NA': 0.013, '1': 0.947, '3': 0.013, '4': 0.009, '99': 0.006, 
+                '43': 0.002, '2': 0.002, '37': 0.001, 
+                '18': 0.001, '17': 0.0008, '47': 0.0007, '01': 0.0006, 
+                '36': 0.000075, '03': 0.000075, '10': 0.000075, '49': 0.000075}
+CMFCUS1_PURPOSE = {'NA': 0.449, '1': 0.155, 'E': 0.151, '4': 0.090, '6': 0.048, 
+                   'C': 0.038, '5': 0.030, 'D': 0.025, 'F': 0.005, '2': 0.002, 
+                   '9': 0.0008, '3': 0.000075, '7': 0.000075}
+CMFCUS1_DERIVATIVE = {'NA': 0.994, '1': 0.004, '2': 0.001, '3': 0.0003}
+CMFCUS1_TITLE_CODE = {'NA': 0.9998, '01': 0.00075, '12': 0.000062, '02': 0.000025}
+CUST_TYP = {'1Z': 0.794, '2Z': 0.006, '3Z': 0.000062, '4Z': 0.003, 
+            '5Z': 0.190, '6Z': 0.004, '7Z': 0.000424,}
+LN_TYP = {'NA': 0.056, '0': 0.863, '1': 0.05, '2': 0.029}
+CONFIRM_TYPE = {'NA': 0.466, '1': 0.479, '2': 0.020, '3': 0.033} 
+CORP_TYPE = {'NA': 0.374, '1': 0.0001, '2': 0.000075, '3': 0.0014, '4': 0.075, 
+             '5': 0.0164, '6': 0.000162, '7': 0.00204, 
+             'A': 0.000075, 'Z': 0.530}
+CMFCUS25_BRANCH = {'NA': 0.325, '0': 0.671, '1': 0.0001, '2': 0.0003, 
+                   '3': 0.0003, '4': 0.0023}
+CMFCUS25_FORE_CASH_FLAG = {'NA': 0.9999, '2': 0.00001}
+
+
+
+# 2. Create fake dataframe
+df = pd.DataFrame()
+
+# 2.1 
+# np.random.choice would occur error if probability doesn't add up to 1
+def fix_p(p):
+    if sum(p) != 1.0:
+        # Make sure total probability equals 1
+        p = [x * (1./sum(p)) for x in p]
+    return p
+
+all_col = cat_col + num_col + ord_col + dum_col
+
+
+for col in all_col:
+    temp = globals()[col]
+    df[col] = np.random.choice(a=list(temp.keys()), size=80132, 
+                               p=fix_p(list(temp.values())))
+
+
+
+df['CMFCUS1_FINANCIAL_ACT'].value_counts(dropna=False)
+df['IX_FG'].value_counts(dropna=False)
+df['BEARER_SHARE'].value_counts(dropna=False)
+
+
+# Use this way to select which should be assigned as 'SAR_ALERT' = 'Y'
+target = (df['CMFCUS1_FINANCIAL_ACT'] == 'Y').astype(int) + (df['EB_FG'] == 'v').astype(int) + (df['CDD_STATUS'] == 'N').astype(int) + (df['AMT_RANGE'].replace('NA', 0)).astype(int) + (df['OBU_ANNUAL_INCOME'].replace('NA', 0)).astype(int)
+target.value_counts()
+# Select larger than 7
+df['SAR_ALERT'] = 'N'
+df.loc[target[target >= 7].index, 'SAR_ALERT'] = 'Y'
+
+
+df = df.replace('NA', np.nan)
+
+# df.to_csv("C:/Users/FE514WL/Desktop/CRR_OBU_fakedata.csv", index=False)
+
